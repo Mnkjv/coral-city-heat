@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Coral City Heat</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1420; font-family: system-ui, 'Segoe UI', sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { display: none; }
+  .panel { background: rgba(8, 12, 20, 0.55); border-radius: 10px; padding: 8px 12px; }
+  #topleft { position: fixed; top: 14px; left: 14px; min-width: 170px; }
+  #cash { font-size: 26px; font-weight: 800; color: #7ee787; letter-spacing: 0.5px; }
+  #healthwrap { height: 12px; background: rgba(255,255,255,0.18); border-radius: 6px; margin-top: 6px; overflow: hidden; }
+  #healthfill { height: 100%; width: 100%; background: #59d977; transition: width 0.2s; }
+  #healthlabel { font-size: 11px; opacity: 0.85; margin-top: 3px; }
+  #stars { position: fixed; top: 14px; right: 14px; font-size: 30px; letter-spacing: 3px; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+  #objective { position: fixed; top: 58px; left: 50%; transform: translateX(-50%); font-size: 17px; font-weight: 700; text-align: center; max-width: 70vw; text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
+  #dialogue { position: fixed; bottom: 118px; left: 50%; transform: translateX(-50%); max-width: 640px; text-align: center; font-size: 16px; font-style: italic; background: rgba(8,12,20,0.66); padding: 10px 16px; border-radius: 10px; border-left: 4px solid #ffc93c; opacity: 0; transition: opacity 0.4s; }
+  #banner { position: fixed; top: 110px; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 800; color: #ffc93c; text-shadow: 0 2px 8px rgba(0,0,0,0.8); opacity: 0; transition: opacity 0.4s; }
+  #prompt { position: fixed; bottom: 170px; left: 50%; transform: translateX(-50%); font-size: 16px; font-weight: 700; color: #aee7ff; text-shadow: 0 2px 6px rgba(0,0,0,0.8); }
+  #speed { position: fixed; right: 18px; bottom: 210px; font-size: 24px; font-weight: 800; text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
+  #muted { position: fixed; right: 18px; bottom: 188px; font-size: 12px; color: #ffb3a7; }
+  #minimap { position: fixed; right: 14px; bottom: 14px; width: 190px; height: 190px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.35); background: #20262e; }
+  #hint { position: fixed; left: 14px; bottom: 14px; font-size: 12.5px; line-height: 1.55; opacity: 0.92; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 52%, rgba(200, 20, 20, 0.55) 100%); }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(10,16,28,0.25), rgba(10,16,28,0.78)); text-align: center; z-index: 5; }
+  .overlay h1 { font-size: 64px; margin: 0 0 4px; letter-spacing: 3px; color: #ffd166; text-shadow: 0 4px 24px rgba(0,0,0,0.7); }
+  .overlay h2 { font-size: 34px; margin: 0 0 10px; color: #ffd166; }
+  .overlay p.tag { font-size: 18px; margin: 0 0 22px; color: #d7ecff; }
+  .overlay .controls { font-size: 14.5px; line-height: 1.7; color: #e8f2fa; background: rgba(8,12,20,0.55); padding: 12px 22px; border-radius: 12px; margin-bottom: 24px; }
+  button { font-size: 18px; font-weight: 700; padding: 12px 34px; margin: 5px; border: none; border-radius: 10px; cursor: pointer; background: #ffc93c; color: #20180a; }
+  button:hover { background: #ffda6b; }
+  button.secondary { background: #33506e; color: #eaf4ff; }
+  #pause, #gameover { display: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Coral City Heat: an open-world crime game in a coastal city"></canvas>
+
+<div id="hud">
+  <div id="topleft" class="panel">
+    <div id="cash">$120</div>
+    <div id="healthwrap"><div id="healthfill"></div></div>
+    <div id="healthlabel">SOL VEGA — HEALTH</div>
+  </div>
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="objective"></div>
+  <div id="banner"></div>
+  <div id="dialogue"></div>
+  <div id="prompt"></div>
+  <div id="speed"></div>
+  <div id="muted"></div>
+  <canvas id="minimap" width="190" height="190"></canvas>
+  <div id="hint" class="panel">
+    WASD move / drive · Mouse look · Shift sprint · F enter/exit car<br>
+    Space handbrake · Click shoot (on foot) · E interact · P pause · M mute
+  </div>
+  <div id="vignette"></div>
+</div>
+
+<div id="menu" class="overlay">
+  <h1>CORAL CITY HEAT</h1>
+  <p class="tag">Sol Vega, courier-turned-wheelman. Five jobs for fixer Dario Fenn.<br>One syndicate to burn down. A whole coastal city to run.</p>
+  <div class="controls">
+    <b>Controls</b><br>
+    WASD — move / drive &nbsp;·&nbsp; Mouse — camera (click the game to lock)<br>
+    Shift — sprint &nbsp;·&nbsp; F — enter / exit car &nbsp;·&nbsp; Space — handbrake<br>
+    Mouse click — fire pistol (on foot) &nbsp;·&nbsp; E — interact / collect / wash<br>
+    P or Esc — pause &nbsp;·&nbsp; M — mute
+  </div>
+  <div>
+    <button id="newGameBtn">New Game</button>
+    <button id="continueBtn" class="secondary">Continue</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay">
+  <h2>Paused</h2>
+  <p class="tag">Coral City waits for no one — except now.</p>
+  <div>
+    <button id="resumeBtn">Resume</button>
+    <button id="restartBtn" class="secondary">Restart</button>
+  </div>
+</div>
+
+<div id="gameover" class="overlay">
+  <h2>WASTED</h2>
+  <p class="tag">Coral General Hospital can patch you up — for a price.</p>
+  <div>
+    <button id="respawnBtn">Respawn at Hospital</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
